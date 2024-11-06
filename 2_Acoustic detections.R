@@ -37,10 +37,11 @@ release.data <- read.csv(here("raw data", "acoustic fish release data.csv"))%>%
 
 tag.meta <- tag.deployment%>%
   full_join(., release.data, by=c("release.date", "trough.section"))%>%
-  mutate(release.datetime=ymd_hm(paste(release.date, release.time, by=" ")))
+  mutate(release.datetime=ymd_hm(paste(release.date, release.time, by=" ")), 
+         release.date=ymd(release.date))
 
 tag.meta %>%
-  group_by(release.location)%>%
+  group_by(release.date, release.location)%>%
   summarise(length(unique(tagid)))
 
 length(unique(tag.meta$tagid)) # one ID is missing????
@@ -78,7 +79,7 @@ df3 <- df2 %>%
   mutate(diff.time = difftime(datetime.local, lag(datetime.local), units="secs"))
 
 # now recalculate time diffs
-df4 <- df4 %>% 
+df4 <- df3 %>% 
   group_by(tagID)%>%
   arrange(., tagID, datetime.local)%>%
   mutate(diff.time = difftime(datetime.local, lag(datetime.local), units="secs"))
@@ -161,5 +162,32 @@ df5 %>%
   group_by(release.location, location_site)%>%
   summarise(length(unique(tagID)))
 
-# there are a lot of fish detected in places theye weren't relased.
+# there are a lot of fish detected in places they weren't released. Fish release downstream of each pump
+# shouldn't be upstream of pumps.
 
+dat_qa <- df5 %>%
+  mutate(location_site=paste(Location, Site, sep="-"))%>%
+  filter(release.location %in% c("hat.ds","ham.ds") & location_site %in% c("upstream-mountain slough", "upstream-hatzic"))
+
+
+dat_qa %>%
+  group_by(release.location, release.datetime, location_site)%>%
+  summarise(length(unique(tagID)))
+
+df5 %>%
+  mutate(location_site=paste(Location, Site, sep="-"))%>%
+  filter(release.location %in% "hat.ds" & release.datetime %in% "2024-05-15 11:46:00" & location_site %in% "upstream-hatzic") %>%
+  group_by(tagID)%>%
+  summarise(n())%>%
+  rename(tagid=tagID)%>%
+  merge(., tag.meta, by="tagid") # all these fish could have gone up stream with the tides as the tide gates were still open at hatzic.
+
+
+dat_qa %>%
+  filter(release.location %in% "hat.ds" & location_site %in% "upstream-hatzic")%>%
+  summarise(unique(Receiver)) # this is the only upstream receiver so it seems fish went upstream!
+
+## Plot Detection Histories for each fish ####
+# start with numbering receivers at each location. Ham.us=1, ham.sd=2, hat.us=3, hat.ds=4. 
+# add row for release at start.
+# plot the release group that was detected upstream of hatzic first (17 fish). 

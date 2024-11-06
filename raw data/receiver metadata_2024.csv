@@ -1,14 +1,14 @@
-Receiver,Orientation,Location,Direction,Lattitude,Longitude,Way.Point,Site
-108661,horizontal,upstream,RR pointed north to cover pump entrance. Attached to stairs,49.23706,121.8563,103,mountain slough
-108658,horizontal,upstream,RL towards pump intake,49.23706,121.85648,104,mountain slough
-108654,horizontal,upstream,pointed upstream away from pumpstation,49.23713,121.85722,105,mountain slough
-101503,horizontal,downstream,RR pointed towards center of channel,49.23622,121.85696,106,mountain slough
-108660,vertical,downstream,RR pointed upwards with float,49.23654,121.85592,107,mountain slough
-108647,horizontal,downstream,center of channel between floodgates pointed downstream,49.23575,121.85636,108,mountain slough
-na,vertical,downstream,In fraser river on piling just downstream of channel confluence,49.233912,121.85597,,mountain slough
-108649,horizontal ,upstream,in center of channel pointed towards pumpstation,49.14423,122.22656,109,hatzic
-108655,horizontal ,downstream,right of island/ penisula pointing downstream,49.14337,122.23683,110,hatzic
-480051,vertical,downstream,left of  island infront of pump,49.14305,122.23692,111,hatzic
-108643,horizontal,downstream,RL pointed to center of channel,49.14297,122.23738,112,hatzic
-108650,horizontal,upstream,head of forebay on RL,49.143593,122.233941,,hatzic
-108651,vertical,upstream,on  piling upstream of flood gates,49.143123,122.235045,,hatzic
+Receiver,Orientation,Location,Direction,Lattitude,Longitude,y,Way.Point,Site
+108661,horizontal,upstream,RR pointed north to cover pump entrance. Attached to stairs,49.23706,121.8563,-121.8563,103,mountain slough
+108658,horizontal,upstream,RL towards pump intake,49.23706,121.85648,-121.85648,104,mountain slough
+108654,horizontal,upstream,pointed upstream away from pumpstation,49.23713,121.85722,-121.85722,105,mountain slough
+101503,horizontal,downstream,RR pointed towards center of channel,49.23622,121.85696,-121.85696,106,mountain slough
+108660,vertical,downstream,RR pointed upwards with float,49.23654,121.85592,-121.85592,107,mountain slough
+108647,horizontal,downstream,center of channel between floodgates pointed downstream,49.23575,121.85636,-121.85636,108,mountain slough
+na,vertical,downstream,In fraser river on piling just downstream of channel confluence,49.233912,121.85597,-121.85597,,mountain slough
+108649,horizontal ,upstream,in center of channel pointed towards pumpstation,49.14423,122.22656,-122.22656,109,hatzic
+108655,horizontal ,downstream,right of island/ penisula pointing downstream,49.14337,122.23683,-122.23683,110,hatzic
+480051,vertical,downstream,left of  island infront of pump,49.14305,122.23692,-122.23692,111,hatzic
+108643,horizontal,downstream,RL pointed to center of channel,49.14297,122.23738,-122.23738,112,hatzic
+108650,horizontal,upstream,head of forebay on RL,49.143593,122.233941,-122.233941,,hatzic
+108651,vertical,upstream,on  piling upstream of flood gates,49.143123,122.235045,-122.235045,,hatzic
