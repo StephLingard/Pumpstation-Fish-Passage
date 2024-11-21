@@ -212,7 +212,7 @@ fish.dat$location_site <- fish.dat$release.location
 levels(fish.dat$location_site) <- forcats::fct_recode(fish.dat$location_site, 
                                                          'upstream-mountain slough'="ham.us",
                                                          'downstream-mountain slough'="ham.ds",
-                                                         'upstream-haztic'="hat.us",
+                                                         'upstream-hatzic'="hat.us",
                                                          'downstream-hatzic'="hat.ds")
 release.df <- fish.dat%>%
   mutate(Receiver=NA,
@@ -233,15 +233,22 @@ plot.df <- df6%>%
 levels(plot.df$location) <- fct_recode(plot.df$location, 
                                             '1'="upstream-mountain slough",
                                             '2'="downstream-mountain slough",
-                                            '3'="upstream-haztic",
+                                            '3'="upstream-hatzic",
                                             '4'="downstream-hatzic")
 
 
-plot.df %>%
+up.fish <- plot.df %>%
   filter(tagID %in% up.movement$tagID)%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
   facet_wrap(~tagID)
 
+
+ggsave(up.fish, file=here("figures","Hammersley Upstream Movement.png"),
+                          width=9, height=8)
   
+plot.df %>%
+  filter(tagID %in% up.movement$tagID)%>%
+  group_by(Receiver)%>%
+  summarise(n())
