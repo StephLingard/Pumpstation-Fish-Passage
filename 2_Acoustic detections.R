@@ -63,7 +63,8 @@ df3 <- df2 %>%
   select(-c(Sensor.Precision, Sensor.Unit, Sensor.Value, Transmitter.Name, Transmitter.Serial, Transmitter.Type))%>%
   group_by(tagID)%>%
   arrange(., tagID, datetime.local)%>%
-  mutate(diff.time = difftime(datetime.local, lag(datetime.local), units="secs"))
+  mutate(diff.time = difftime(datetime.local, lag(datetime.local), units="secs"))%>%
+  filter(diff.time >=45)
 
 # now recalculate time diffs after filtering out erroneous detections
 
@@ -128,56 +129,60 @@ fish.dat %>%
   summarise(length(unique(tagID))) # 300 total
 
 df6 <- df6%>%
-  merge(., fish.dat, by="tagID")%>%
-  select(-c('Date.and.Time..UTC.',Transmitter))
+  mutate(location_site=paste(Location, Site, sep="-"))%>%
+  merge(., fish.dat, by="tagID")
+
+# Remove tags that aren't detected at least twice in the same "location-site" with in 1 hour ####
+
+df7 <- df6 %>%
+  group_by(tagID)%>%
+  mutate(cond1 = ifelse(lead(diff.time) > 3600, FALSE, TRUE), 
+         cond2= ifelse(diff.time > 3600, FALSE, TRUE))%>%
+  filter(cond1 | cond2 == TRUE)
 
 # Data exploration and QA ####
-# how many IDs detected?
 
-length(unique(df6$tagID)) #287 IDs detected out of 300
+length(unique(df7$tagID)) #287 IDs detected out of 300
 
 # Fish detected
 
-df6 %>%
+df7 %>%
   group_by(release.location)%>%
   summarise(length(unique(tagID)))
 
-#Hammersley: 103 released upstream but 102 detected, # 105 released downstream but 98 detected
+# Hammersley: 103 released upstream but 102 detected, # 105 released downstream but 98 detected
 # Hatzic: 51 released ds with 50 detected, 41 released up with 39 detected
 
 # were any fish released downstream detected upstream?
 
-df6 %>%
+df7 %>%
   group_by(release.location,Location)%>%
   summarise(length(unique(tagID))) # a few. Could be noise
 
 # what about fish moving upstream? only interested in Hammersley because there is no upstream path (apparently)
 
-df6 %>%
+df7 %>%
   mutate(location_site=paste(Location, Site, sep="-"))%>%
   group_by(release.location, location_site)%>%
   summarise(length(unique(tagID)))
 
-up.movement <- df6%>%
-  mutate(location_site=paste(Location, Site, sep="-"))%>%
+up.movement <- df7%>%
   filter(release.location %in% "ham.ds" & location_site %in% "upstream-mountain slough")
 
 up.movement%>%
   ggplot(., aes(x=datetime.local))+
-  geom_histogram()
+  geom_histogram()+
+  facet_wrap(~tagID)
 
-up.movement%>% 
-  group_by(tagID)%>%
-  summarise(n()) # there are a lot of detections of some of these fish
+# there are a lot of detections of some of these fish and the filters are very conservative
 
-upID <- up.movement%>%
+upIDs <- up.movement%>%
   group_by(tagID)%>%
   filter(row_number()==1)
 
 ## Data QA and Clean Up ####
 
-dat_qa <- df6 %>%
-  mutate(location_site=paste(Location, Site, sep="-"))%>%
+dat_qa <- df7 %>%
   filter(release.location %in% c("hat.ds","ham.ds") & location_site %in% c("upstream-mountain slough", "upstream-hatzic"))
 
 
@@ -185,19 +190,12 @@ dat_qa %>%
   group_by(release.location, release.datetime, location_site)%>%
   summarise(length(unique(tagID)))
 
-df6 %>%
-  mutate(location_site=paste(Location, Site, sep="-"))%>%
+df7 %>%
   filter(release.location %in% "hat.ds" & release.datetime %in% "2024-05-15 11:46:00" & location_site %in% "upstream-hatzic") %>%
   group_by(tagID)%>%
   summarise(n())%>%
   rename(tagid=tagID)%>%
   merge(., tag.meta, by="tagid") # all these fish could have gone up stream with the tides as the tide gates were still open at hatzic.
-
-
-dat_qa %>%
-  filter(release.location %in% "hat.ds" & location_site %in% "upstream-hatzic")%>%
-  summarise(unique(Receiver)) # this is the only upstream receiver so it seems fish went upstream!
-
 
 ## Plot Detection Histories for each fish ####
 # start with numbering receivers at each location. Ham.us=1, ham.sd=2, hat.us=3, hat.ds=4. 
@@ -219,7 +217,7 @@ release.df <- fish.dat%>%
          datetime.local=release.datetime, 
          location=release.location)
 
-plot.df <- df6%>%
+plot.df <- df7%>%
   mutate(location_site=paste(Location, Site, sep="-"))%>%
   select(tagID, location_site, datetime.local, release.location, 
          release.datetime, Receiver)%>%
@@ -239,6 +237,7 @@ levels(plot.df$location) <- fct_recode(plot.df$location,
 
 up.fish <- plot.df %>%
   filter(tagID %in% up.movement$tagID)%>%
+  mutate(location=as.numeric(location))%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
