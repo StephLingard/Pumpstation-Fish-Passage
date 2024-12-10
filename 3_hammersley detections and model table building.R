@@ -23,18 +23,35 @@ dets <- read_csv(here("cleaned data","cleaned detections from hammersley.csv"),s
   merge(., site_rkm, by="location_site")%>%
   group_by(tagID)%>%
   arrange(tagID, datetime.local)%>%
-  mutate(time_next=difftime(lead(datetime.local), datetime.local, units="mins"),
-         transition=ifelse(location_site == lead(location_site),F,T))
+  mutate(time_prev=difftime(datetime.local, lag(datetime.local), units="secs"),
+         transition=ifelse(location_site == lag(location_site),F,T),
+         prev_rkm=lag(rkm),
+         dist_traveled=abs(rkm-lag(rkm)),
+         speed_bodyL_secs=(dist_traveled/0.0012)/as.numeric(time_prev))
 
-# need to add a row for release location and datetime. so want to add a column for "type" release/det
-# then release location = location_site and release datetime=datetime.local
+test.speed <- dets %>%
+  filter(speed_bodyL_secs>1)
 
-release.dat <- read.csv(here("cleaned data","fish release date time location.csv"), show_col_types = FALSE)
+test.dir <- dets %>%
+  mutate(next_rkm=lead(rkm),
+    upstream_movement=ifelse(next_rkm > rkm, TRUE, FALSE))%>%
+  filter(upstream_movement==TRUE)
+
+# need to remove these two detections
 
 
-# we need to know how many were missed by each of the receivers in the Fraser to decide
-# how to group the data or clean it.
-# ideally i would remove any fish only detected once on one receiver
+speed_distribution <- dets%>%
+  filter(speed_bodyL_secs > 0.0000)%>%
+  ggplot(., aes(x=speed_bodyL_secs))+
+  geom_histogram()+
+  labs(x="Speed (body lengths per second)")
+
+ggsave(speed_distribution, file=here("figures","travel speeds.png"),
+       width=6, height=8)
+  
+# travel times look okay! moving on to CJS models
+
+# Make CJS model table ####
 
 
 

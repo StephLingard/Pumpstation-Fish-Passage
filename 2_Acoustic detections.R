@@ -30,7 +30,7 @@ df$datetime.local=with_tz(df$datetime.utc, "America/Vancouver")
 df$receiver.serial <- gsub(".*-","",df$Receiver)
 df$tagID <- gsub(".*-*-","",df$Transmitter)
 
-#remove false detections
+#remove suspected false detections
 # read in tagging and release data ####
 
 tag.deployment <- read.csv(here("raw data", "acoustic tagging.csv"))%>%
@@ -86,33 +86,6 @@ df4 <- df3 %>%
 # check the filter worked
 min(df4$diff.time, na.rm=T)
 
-# One minute data filter #### 
-# Explanation: there must be a second detection with in 1 minute of the current one.
-# diff_time is the time difference between the current time and the previous record. lead diff.time is the time between obs and next obs
-
-df5 <- df4 %>%
-  group_by(tagID)%>%
-  mutate(Cond1=ifelse(diff.time <=60, TRUE, FALSE), 
-         Cond2=ifelse(lead(diff.time) <=60, TRUE, FALSE))%>%
-  filter(Cond2 == TRUE | Cond1==TRUE)
-
-
-# filter out non-study tags ####
-non.study.tags <- df%>%
-  filter(receiver.serial != 108656 & !tagID %in% tag.meta$tagid )
-
-sensors <- non.study.tags %>%
-  mutate(sensor=ifelse(Sensor.Value > 0, "Yes","No"))%>%
-  filter(sensor=="Yes")
-
-summary <- non.study.tags %>%
-  group_by(tagID)%>%
-  summarise(n=n())%>%
-  filter(n>1)%>%
-  mutate(sensor= ifelse(tagID %in% sensors$tagID, "Yes", "No"))
-
-#write.csv(summary, file=here("data summaries","non study tags.csv"))
-
 # Read in receiver meta ####
 
 r.meta <- read.csv(here("raw data", "receiver metadata_2024.csv"))%>%
@@ -120,17 +93,17 @@ r.meta <- read.csv(here("raw data", "receiver metadata_2024.csv"))%>%
 
 # remove "VR2W-" and "VR2Tx" from Receiver in df4
 
-df5$Receiver <- gsub("VR2W-","", df5$Receiver)
-df5$Receiver <- gsub("VR2Tx-","", df5$Receiver)
+df4$Receiver <- gsub("VR2W-","", df4$Receiver)
+df4$Receiver <- gsub("VR2Tx-","", df4$Receiver)
 
 # now add in location and up or downstream by merging dfs
 # also add in release.datetime and location column
 
-df6 <- df5 %>% 
+df5 <- df4 %>% 
   select(-c(Station.Name, Latitude, Longitude))%>%
   merge(., r.meta, by="Receiver")
 
-df6 <- df6%>%
+df6 <- df5%>%
   mutate(location_site=paste(Location, Site, sep="-"))%>%
   merge(., fish.dat, by="tagID")
 
@@ -152,7 +125,7 @@ df7 %>%
   group_by(release.location)%>%
   summarise(length(unique(tagID)))
 
-# Hammersley: 103 released upstream but 102 detected, # 105 released downstream but 98 detected
+# Hammersley: 103 released upstream and 103 detected, # 105 released downstream but 100 detected
 # Hatzic: 51 released ds with 50 detected, 41 released up with 39 detected
 
 # were any fish released downstream detected upstream?
@@ -180,6 +153,8 @@ up.movement%>%
 upIDs <- up.movement%>%
   group_by(tagID)%>%
   filter(row_number()==1)
+# checked the map and it looks like dets could transmit through the flood gates as fish were detected on receiver ds of flood gate and the pump
+# at the same time.
 
 ## Data QA and Clean Up ####
 dat_qa <- df7 %>%
@@ -216,7 +191,8 @@ levels(fish.dat$location_site) <- forcats::fct_recode(fish.dat$location_site,
 release.df <- fish.dat%>%
   mutate(Receiver="release",
          datetime.local=release.datetime, 
-         location=release.location)
+         location=release.location,
+         tagID=as.character(tagID))
 
 plot.df <- df7%>%
   mutate(location_site=paste(Location, Site, sep="-"))%>%
@@ -233,7 +209,7 @@ plot.df <- df7%>%
 
 plot.df$Receiver <- factor(plot.df$Receiver, levels=c("release","108647","101503","10866","108661","108658","108654"))
 
-
+# Exploring through a plot why fish were detected moving up stream past pump ####
 up.fish <- plot.df %>%
   filter(tagID %in% up.movement$tagID)%>%
   ggplot(., aes(x=datetime.local, y=Receiver))+
@@ -244,18 +220,10 @@ up.fish <- plot.df %>%
 ggsave(up.fish, file=here("figures","Hammersley Upstream Movement.png"),
        width=9, height=8)
 
-# all the fish detected at the same time up and down were detected on the receiver ds of flood gates. 
+# all the fish detected at the same time up and down were detected on the receiver ds of flood gates.
+# so transmission could travel through flood gates. Will have to edit this out later when interpreting things
 
-test <- df7 %>%
-  ungroup()%>%
-  filter(Receiver!=108660)%>%
-  summarise(length(unique(tagID))) # doesn't delete any tag IDS to remove this receiver.
-
-# remove the receiver from the analysis
-df8 <- df7%>%
-  filter(Receiver!=108660)
-
-# read in Fraser Data ####
+# Read in Fraser Data ####
 
 fish.rel.dat <- fish.dat %>% 
   select(tagID, release.location)
@@ -271,9 +239,9 @@ fraser.dets <- read.csv(here("raw data","Detections_DI_JS_Fraser_Lingard_2024_30
          tagID=as.integer(tagID))%>%
   merge(., fish.rel.dat, by="tagID")
 
-# array up to downstream 
+# merge all detections and arrange up to downstream  ####
 
-all.dets <- df8%>%
+all.dets <- df7%>%
   mutate(tagID=as.integer(tagID), Receiver=as.integer(Receiver))%>%
   select(tagID, datetime.local,Receiver, location_site, Site, release.location)%>%
   bind_rows(., fraser.dets)
@@ -281,17 +249,34 @@ all.dets <- df8%>%
 ham.dets <- all.dets%>%
   filter(release.location %in% c("ham.ds", "ham.us"))%>%
   group_by(tagID)%>%
-  arrange(datetime.local)
+  arrange(datetime.local)%>%
+  mutate(type="detection", 
+         tagID=as.integer(tagID),
+         Receiver=as.character(Receiver))
 
+### data check ####
 ham.dets %>%
   ungroup()%>%
   filter(release.location %in% c("ham.ds", "ham.us"))%>%
-  summarise(length(unique(tagID)))# 196 detected
+  summarise(length(unique(tagID)))# 201 detected
+
+## create row with relase information ###
+ham.releases <- release.df%>%
+  filter(release.location %in% c("ham.us","ham.ds"))%>%
+  select(tagID,datetime.local,release.location,location_site,Receiver)%>%
+  mutate(Site="mountain slough",
+         type="release", 
+         tagID=as.integer(tagID))
+
+ham.dets2 <- ham.dets %>%
+  bind_rows(., ham.releases)%>%
+  group_by(tagID)%>%
+  arrange(tagID, datetime.local)
 
 #locations <- hammersley>mission>derby>barnston>portman>new west
 
 
-ham.dets$location_site <- factor(ham.dets$location_site, 
+ham.dets2$location_site <- factor(ham.dets2$location_site, 
                                       levels=c(
                                       "NEW_WEST",
                                       "PORT_MANN",
@@ -303,7 +288,7 @@ ham.dets$location_site <- factor(ham.dets$location_site,
                                       "upstream-mountain slough",
                                       "release"))
 
-ham.plots1 <- ham.dets%>%
+ham.plots1 <- ham.dets2%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
@@ -312,7 +297,7 @@ ham.plots1 <- ham.dets%>%
   facet_wrap_paginate(~tagID, scales="free_x",
              nrow=4, ncol=4, page=1)
 
-ham.plots2 <- ham.dets%>%
+ham.plots2 <- ham.dets2%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
@@ -321,7 +306,7 @@ ham.plots2 <- ham.dets%>%
   facet_wrap_paginate(~tagID, scales="free_x",
                       nrow=4, ncol=4, page=2)
 
-ham.plots3 <- ham.dets%>%
+ham.plots3 <- ham.dets2%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
@@ -331,7 +316,7 @@ ham.plots3 <- ham.dets%>%
                       nrow=4, ncol=4, page=3)
 
 
-ham.plots4 <- ham.dets%>%
+ham.plots4 <- ham.dets2%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
@@ -340,7 +325,7 @@ ham.plots4 <- ham.dets%>%
   facet_wrap_paginate(~tagID, scales="free_x",
                       nrow=4, ncol=4, page=4)
   
-ham.plots5 <- ham.dets%>%
+ham.plots5 <- ham.dets2%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
@@ -361,11 +346,11 @@ ggsave(ham.plots5, file=here("figures", "hammersley fish page 5.png"),
        width=10, height=8)
 
 ## How many fish passed hammersley? #####
-dets_location <- ham.dets %>%
+dets_location <- ham.dets2 %>%
   group_by(release.location, tagID, Site)%>%
   summarise(n=n())
 
-detected.in.fraser <- ham.dets %>%
+detected.in.fraser <- ham.dets2 %>%
   group_by(tagID, location_site)%>%
   summarise(n= n())%>%
   ungroup()%>%
@@ -374,16 +359,16 @@ detected.in.fraser <- ham.dets %>%
   group_by(release.location)%>%
   summarise(length(unique(tagID)))
 
-# how many sites in the fraser for each fish - will influence CJS mdoels
+# how many sites in the fraser for each fish - will influence CJS models
 
 number.sites.detected.fraser <- 
-  ham.dets %>%
+  ham.dets2 %>%
   group_by(tagID)%>%
   filter(Site %in% "fraser")%>%
   summarise(n=length(unique(location_site)))
   
 
-summary <- ham.dets %>%
+summary <- ham.dets2 %>%
   ungroup()%>%
   group_by(location_site,release.location)%>%
   summarise(n=length(unique(tagID)))%>%
@@ -391,4 +376,20 @@ summary <- ham.dets %>%
 
 write.csv(summary, file=here("data summaries", "very rough detection summary.csv"))
 
-write.csv(ham.dets, file=here("cleaned data","cleaned detections from hammersley.csv"))
+write.csv(ham.dets2, file=here("cleaned data","cleaned detections from hammersley.csv"))
+
+# # filter out non-study tags ####
+non.study.tags <- df%>%
+  filter(receiver.serial != 108656 & !tagID %in% tag.meta$tagid )
+
+sensors <- non.study.tags %>%
+  mutate(sensor=ifelse(Sensor.Value > 0, "Yes","No"))%>%
+  filter(sensor=="Yes")
+
+summary <- non.study.tags %>%
+  group_by(tagID)%>%
+  summarise(n=n())%>%
+  filter(n>1)%>%
+  mutate(sensor= ifelse(tagID %in% sensors$tagID, "Yes", "No"))
+
+#write.csv(summary, file=here("data summaries","non study tags.csv"))
