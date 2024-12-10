@@ -15,6 +15,7 @@
 library(tidyverse)
 library(purrr)
 library(here)
+library(ggforce)
 
 
 # read in raw detections ####
@@ -46,7 +47,16 @@ tag.meta %>%
   group_by(release.location)%>%
   summarise(length(unique(tagid)))
 
-length(unique(tag.meta$tagid)) # one ID is missing????
+
+fish.dat <- tag.meta%>%
+  select(tagid, release.datetime,release.location)%>%
+  rename(tagID=tagid)
+
+write.csv(fish.dat, file=here("cleaned data"," fish release date time location.csv"))
+
+fish.dat %>%
+  group_by(release.location)%>%
+  summarise(length(unique(tagID))) # 300 total
 
 tag.deployment.receiver <- df %>%
   filter(receiver.serial == 108656)
@@ -119,14 +129,6 @@ df5$Receiver <- gsub("VR2Tx-","", df5$Receiver)
 df6 <- df5 %>% 
   select(-c(Station.Name, Latitude, Longitude))%>%
   merge(., r.meta, by="Receiver")
-
-fish.dat <- tag.meta%>%
-  select(tagid, release.datetime,release.location)%>%
-  rename(tagID=tagid)
-
-fish.dat %>%
-  group_by(release.location)%>%
-  summarise(length(unique(tagID))) # 300 total
 
 df6 <- df6%>%
   mutate(location_site=paste(Location, Site, sep="-"))%>%
@@ -290,20 +292,23 @@ ham.dets %>%
 
 
 ham.dets$location_site <- factor(ham.dets$location_site, 
-                                      levels=c("release",
-                                        "upstream-mountain slough",
-                                      "downstream-mountain slough",
-                                      "downstream-hatzic",
-                                      "MISSION",
-                                      "DERBY",
-                                      "BARNSTON",
+                                      levels=c(
+                                      "NEW_WEST",
                                       "PORT_MANN",
-                                      "NEW_WEST"))
+                                      "BARNSTON",
+                                      "DERBY",
+                                      "MISSION",
+                                      "downstream-hatzic",
+                                      "downstream-mountain slough",
+                                      "upstream-mountain slough",
+                                      "release"))
 
 ham.plots1 <- ham.dets%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
+  theme(axis.text.x=element_text(angle=(-45)))+
+  labs(x="", y="Site Name")+
   facet_wrap_paginate(~tagID, scales="free_x",
              nrow=4, ncol=4, page=1)
 
@@ -311,6 +316,8 @@ ham.plots2 <- ham.dets%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
+  theme(axis.text.x=element_text(angle=(-45)))+
+  labs(x="", y="Site Name")+
   facet_wrap_paginate(~tagID, scales="free_x",
                       nrow=4, ncol=4, page=2)
 
@@ -318,6 +325,8 @@ ham.plots3 <- ham.dets%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
+  theme(axis.text.x=element_text(angle=(-45)))+
+  labs(x="", y="Site Name")+
   facet_wrap_paginate(~tagID, scales="free_x",
                       nrow=4, ncol=4, page=3)
 
@@ -326,6 +335,8 @@ ham.plots4 <- ham.dets%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
+  theme(axis.text.x=element_text(angle=(-45)))+
+  labs(x="", y="Site Name")+
   facet_wrap_paginate(~tagID, scales="free_x",
                       nrow=4, ncol=4, page=4)
   
@@ -333,22 +344,23 @@ ham.plots5 <- ham.dets%>%
   ggplot(., aes(x=datetime.local, y=location_site))+
   geom_point()+
   geom_line()+
+  theme(axis.text.x=element_text(angle=(-45)))+
+  labs(x="", y="Site Name")+
   facet_wrap_paginate(~tagID, scales="free_x",
                       nrow=4, ncol=4, page=5)   
 
+ggsave(ham.plots1, file=here("figures", "hammersley fish page 1.png"), 
+       width=10, height=8)
+ggsave(ham.plots2, file=here("figures", "hammersley fish page 2.png"), 
+       width=10, height=8)
+ggsave(ham.plots3, file=here("figures", "hammersley fish page 3.png"), 
+       width=10, height=8)
+ggsave(ham.plots4, file=here("figures", "hammersley fish page 4.png"), 
+       width=10, height=8)
+ggsave(ham.plots5, file=here("figures", "hammersley fish page 5.png"), 
+       width=10, height=8)
 
 ## How many fish passed hammersley? #####
-
-up.stream_surv <- ham.dets %>% 
-  ungroup()%>%
-  filter(release.location %in% "ham.us" & Site %in% "fraser") %>% 
-  summarise(length(unique(tagID))) #33 out of 105
-
-down.stream_surv <-  ham.dets %>% 
-  ungroup()%>%
-  filter(release.location %in% "ham.ds" & Site %in% "fraser") %>% 
-  summarise(length(unique(tagID)))
-
 dets_location <- ham.dets %>%
   group_by(release.location, tagID, Site)%>%
   summarise(n=n())
@@ -356,20 +368,19 @@ dets_location <- ham.dets %>%
 detected.in.fraser <- ham.dets %>%
   group_by(tagID, location_site)%>%
   summarise(n= n())%>%
-  filter(n > 1)%>%
   ungroup()%>%
   filter(!location_site %in% c("upstream-mountain slough", "downstream-mountain slough"))%>%
   merge(., fish.rel.dat, by="tagID")%>%
   group_by(release.location)%>%
   summarise(length(unique(tagID)))
 
-# how man sites in the fraser for each fish - will influence CJS mdoels
+# how many sites in the fraser for each fish - will influence CJS mdoels
 
-ham.dets %>%
+number.sites.detected.fraser <- 
+  ham.dets %>%
   group_by(tagID)%>%
   filter(Site %in% "fraser")%>%
-  summarise(n=length(unique(location_site)))%>%
-  filter(n==1)
+  summarise(n=length(unique(location_site)))
   
 
 summary <- ham.dets %>%
@@ -378,4 +389,6 @@ summary <- ham.dets %>%
   summarise(n=length(unique(tagID)))%>%
   spread(release.location,value = n)
 
-write.csv(summary, file=here("data summaries", "very rough detection summary.csv"))  
+write.csv(summary, file=here("data summaries", "very rough detection summary.csv"))
+
+write.csv(ham.dets, file=here("cleaned data","cleaned detections from hammersley.csv"))
