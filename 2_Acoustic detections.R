@@ -149,6 +149,12 @@ up.movement%>%
   geom_histogram()+
   facet_wrap(~tagID)
 
+df7%>%
+  filter(tagID %in% up.movement$tagID)%>%
+  ggplot(., aes(x=datetime.local, y=Receiver))+
+  geom_point()+
+  facet_wrap(~tagID)
+
 # there are a lot of detections of some of these fish and the filters are very conservative
 upIDs <- up.movement%>%
   group_by(tagID)%>%
@@ -186,8 +192,6 @@ levels(fish.dat$location_site) <- forcats::fct_recode(fish.dat$location_site,
                                                          'downstream-mountain slough'="ham.ds",
                                                          'upstream-hatzic'="hat.us",
                                                          'downstream-hatzic'="hat.ds")
-
-
 release.df <- fish.dat%>%
   mutate(Receiver="release",
          datetime.local=release.datetime, 
