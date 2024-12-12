@@ -46,7 +46,6 @@ dets2 <- dets %>%
          upstream_movement=ifelse(next_rkm > rkm, TRUE, FALSE))%>%
   filter(!upstream_movement %in% TRUE)
   
-
 speed_distribution <- dets2%>%
   filter(speed_bodyL_secs > 0.0000)%>%
   ggplot(., aes(x=speed_bodyL_secs))+
@@ -141,4 +140,28 @@ fit.models=function()
 ham.models=fit.models()
 ham.models
 
-ham.models[[4]]
+ham.models[[4]]$results
+plogis(ham.models[[1]]$results$beta$Phi)
+
+# Try with RMark ####
+library(RMark)
+
+
+test <- process.data(data = cjs_table_ham,
+             model = "CJS")
+ddl <- make.design.data(test)
+
+ham.mark1 <- mark(test, ddl)
+
+# more complicated model ####
+phi.release <- list(formula = ~release)
+p.release <- list(formula=~sex)
+
+phi.time <- list(formula=~time)
+p.time <- list(formula =~time)
+p<- list(formual= ~1)
+
+
+release.model <- mark(test, ddl,
+                      model.parameters=list(Phi=phi.release,
+                                            p=p.release))

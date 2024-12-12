@@ -54,25 +54,54 @@ names(recap.final)
 
 lactate <- ggplot(recap.final, aes(x=release_treatment, y=lactate))+
   geom_boxplot()+
-  geom_point()
+  geom_point()+
+  theme_bw()+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14))+
+  labs(x="Treatment", y="Lactate (mmol/L)")+
+  geom_text(data=(recap.final %>% group_by(treatment) %>% filter(!is.na(lactate)) %>%
+                    summarise(n=n())), aes(x=seq(1,4), y=18, label= paste0("n = ", n)))+
+  expand_limits(y = c(0, 20))
 
+recap.final%>%group_by(treatment)%>%summarise(n())
+
+recap.final %>%
+  select(treatment, hemoglobin, lactate)%>%
+  group_by(treatment)%>%
+  summarise(nhemo=length(hemoglobin,na.rm=TRUE),
+            nlactate=length(lactate,na.rm=TRUE))
+    
+  
 ggsave(lactate, file=here("figures", "lactate by treatment.png"),
        width=7, height=6)
 
 hemo <- ggplot(recap.final, aes(x=release_treatment, y=hemoglobin))+
   geom_boxplot()+
-  geom_point()
+  geom_point()+
+  theme_bw()+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14))+
+  labs(x="Treatment", y="Hemoglobin (g/L)")+
+  geom_text(data=(recap.final %>% group_by(treatment) %>% filter(!is.na(hemoglobin))%>% 
+                    summarise(n=n())), 
+           aes(x=seq(1,4), y=115, label= paste0("n = ", n)))+
+  expand_limits(y = c(50, 120))
 
 ggsave(hemo, file=here("figures", "hemoglobin by treatment.png"),width=7, height=6)
 
 hemo_time <- ggplot(recap.final, aes(x=time_diff, y=hemoglobin, color=release_treatment))+
   geom_point()+
-  labs(x="Time between release and sampling (minutes)")
-
+  labs(x="Time between release and sampling (minutes)")+
+  theme_bw()+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14)+
+          panel.grid.major = element_blank())
+  
+  
 ggsave(hemo_time, file=here("figures", "hemoglobin vs time.png"),width=7, height=6)
 
 recap.final%>%
-  filter(!is.na(hemoglobin))%>%
+  filter(!is.na(hemoglobin))
   
 
 # Injuries
@@ -98,3 +127,4 @@ scale.loss.table <- injuries %>%
          value=as.factor(value))%>%
   group_by(pump, value)%>%
   summarise(n())
+
