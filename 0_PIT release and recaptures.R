@@ -65,15 +65,9 @@ lactate <- ggplot(recap.final, aes(x=release_treatment, y=lactate))+
 
 recap.final%>%group_by(treatment)%>%summarise(n())
 
-recap.final %>%
-  select(treatment, hemoglobin, lactate)%>%
-  group_by(treatment)%>%
-  summarise(nhemo=length(hemoglobin,na.rm=TRUE),
-            nlactate=length(lactate,na.rm=TRUE))
-    
-  
+
 ggsave(lactate, file=here("figures", "lactate by treatment.png"),
-       width=7, height=6)
+       width=6, height=6)
 
 hemo <- ggplot(recap.final, aes(x=release_treatment, y=hemoglobin))+
   geom_boxplot()+
@@ -87,7 +81,7 @@ hemo <- ggplot(recap.final, aes(x=release_treatment, y=hemoglobin))+
            aes(x=seq(1,4), y=115, label= paste0("n = ", n)))+
   expand_limits(y = c(50, 120))
 
-ggsave(hemo, file=here("figures", "hemoglobin by treatment.png"),width=7, height=6)
+ggsave(hemo, file=here("figures", "hemoglobin by treatment.png"),width=6, height=6)
 
 hemo_time <- ggplot(recap.final, aes(x=time_diff, y=hemoglobin, color=release_treatment))+
   geom_point()+
@@ -98,7 +92,7 @@ hemo_time <- ggplot(recap.final, aes(x=time_diff, y=hemoglobin, color=release_tr
           panel.grid.major = element_blank())
   
   
-ggsave(hemo_time, file=here("figures", "hemoglobin vs time.png"),width=7, height=6)
+ggsave(hemo_time, file=here("figures", "hemoglobin vs time.png"),width=6, height=6)
 
 recap.final%>%
   filter(!is.na(hemoglobin))

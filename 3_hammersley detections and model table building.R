@@ -130,6 +130,7 @@ fit.models=function()
    {
        Phi.rl=list(formula=~release)
        Phi.time=list(formula=~time)
+       p.time=list(formula=~time)
        p.rl=list(formula=~release)
        p.dot=list(formula=~1)
        cml=create.model.list(c("Phi","p"))
@@ -140,28 +141,30 @@ fit.models=function()
 ham.models=fit.models()
 ham.models
 
-ham.models[[4]]$results
-plogis(ham.models[[1]]$results$beta$Phi)
-
+ham.models[[3]]$results
+plogis(ham.models[[3]]$results$beta$Phi)
+plogis(ham.models[[3]]$results$beta$p)
 # Try with RMark ####
 library(RMark)
 
 
 test <- process.data(data = cjs_table_ham,
-             model = "CJS")
+             model = "CJS", groups="release")
+
 ddl <- make.design.data(test)
 
 ham.mark1 <- mark(test, ddl)
 
 # more complicated model ####
-phi.release <- list(formula = ~release)
-p.release <- list(formula=~sex)
+phi.release <- list(formula=~release)
+p.release <- list(formula=~release)
 
 phi.time <- list(formula=~time)
 p.time <- list(formula =~time)
-p<- list(formual= ~1)
+p<- list(formual=~1)
 
 
 release.model <- mark(test, ddl,
-                      model.parameters=list(Phi=phi.release,
-                                            p=p.release))
+                      model.parameters=list(Phi=phi.release, p=p.release))
+
+                      
