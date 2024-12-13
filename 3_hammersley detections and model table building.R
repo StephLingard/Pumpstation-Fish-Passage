@@ -165,6 +165,17 @@ p<- list(formual=~1)
 
 
 release.model <- mark(test, ddl,
-                      model.parameters=list(Phi=phi.release, p=p.release))
+                      model.parameters=list(Phi=phi.release))
 
-                      
+estimates <- plogis(release.model$results$beta$estimate)   
+lcl <- plogis(release.model$results$beta$lcl)
+ucl <- plogis(release.model$results$beta$ucl)
+params <- c("Phi:(Intercept)","Phi:release1 ","p:(Intercept)")
+
+results.df <- data.frame(estimates, lcl, ucl, params)
+
+results.df %>% 
+  filter(!params %in% p:(Intercept))%>%
+  ggplot(., aes(x=params, y=estimates))+
+  geom_point()+
+  geom_errorbar(aes(x=params, ymin=lcl, ymax=ucl))
