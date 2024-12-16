@@ -56,7 +56,7 @@ write.csv(fish.dat, file=here("cleaned data"," fish release date time location.c
 
 fish.dat %>%
   group_by(release.location)%>%
-  summarise(length(unique(tagID))) # 300 total
+  summarise(length(unique(tagID))) # 298 tags missing here?
 
 tag.deployment.receiver <- df %>%
   filter(receiver.serial == 108656)
@@ -117,7 +117,7 @@ df7 <- df6 %>%
 
 # Data exploration and QA ####
 
-length(unique(df7$tagID)) #287 IDs detected out of 300
+length(unique(df7$tagID)) #293 IDs detected out of 300
 
 # Fish detected
 

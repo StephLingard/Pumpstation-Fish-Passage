@@ -14,6 +14,7 @@ library(marked)
 # have to remove detections of fish that have traveled downstream or were released downstream of the mountain slough upstream 
 #  pump as the flood gates transmitted the signals and it creates false fast travel times.
 
+# make location-rkm table ####
 
 rkm <- c(110.2,110.1,72,67,45,38,30,23)
 location_site <-c("upstream-mountain slough","downstream-mountain slough","downstream-hatzic","MISSION",
@@ -22,9 +23,13 @@ location_site <-c("upstream-mountain slough","downstream-mountain slough","downs
 site_rkm <- tibble(rkm, location_site)%>%
   mutate(rkm=as.numeric(rkm))
 
-# read in dets and add rkm column
-dets <- read_csv(here("cleaned data","cleaned detections from hammersley.csv"),show_col_types = FALSE)%>%
-  select(-'...1')%>%
+# read in dets and add rkm column ####
+dat <- read_csv(here("cleaned data","cleaned detections from hammersley.csv"),show_col_types = FALSE)%>%
+  select(-'...1')
+
+# manipulate data to have previous and next detections for filtering ####
+dets <- dat%>%
+  filter(Receiver!=	108660)%>%
   merge(., site_rkm, by="location_site")%>%
   group_by(tagID)%>%
   arrange(tagID, datetime.local)%>%
@@ -35,15 +40,24 @@ dets <- read_csv(here("cleaned data","cleaned detections from hammersley.csv"),s
          time_next=difftime(lead(datetime.local), datetime.local, units="secs"),
          dist_traveled=lag(rkm)-rkm)
   
+length(unique(dets$tagID))# all 208 are here
 
 test.dir <- dets %>%
-  filter(next_rkm > rkm)
+  filter(rkm > prev_rkm)# need to remove these
 
 # need to remove dets of fish upstream of pump once they have gone through or been released ds
-# then need to recalculate everything
+# then need to recalculate everything. But don't want to drop releases.
 
+### create release df to merge back in after filtering ####
+releases <- dets%>%
+  filter(Receiver %in% "release")
+
+# create filtered data frame to calcuate travel times ####
 dets2 <- dets %>%
-  filter(dist_traveled >= 0)%>%
+  filter(transition==TRUE & dist_traveled > 0)%>%
+  bind_rows(., releases)%>%
+  group_by(tagID)%>%
+  arrange(datetime.local)%>%
   mutate(time_prev=difftime(datetime.local, lag(datetime.local), units="secs"),
          transition=ifelse(location_site == lag(location_site),F,T),
          prev_rkm=lag(rkm),
@@ -54,7 +68,10 @@ dets2 <- dets %>%
          time_diff_days=as.numeric(time_prev)/(60*60*24),
          speed_km_day=dist_traveled/time_diff_days)
 
-  
+length(unique(dets2$tagID))
+unique(dets2$Receiver)
+
+# speed plots ####
 speed_distribution <- dets2%>%
   filter(speed_bodyL_secs > 0.0000)%>%
   ggplot(., aes(x=speed_bodyL_secs))+
@@ -62,16 +79,14 @@ speed_distribution <- dets2%>%
   labs(x="Speed (body lengths per second)")
 
 speed_km_per_day <- dets2%>%
-  mutate(area = ifelse(rkm %in% c(NA,110.2,110.1) & next_rkm %in% c(NA,110.1,110.2),"Pump","Fraser"))%>%
-  filter(speed_km_day > 0)%>%
+  filter(speed_km_day> 0)%>%
   ggplot(., aes(x=speed_km_day))+
-  geom_histogram()+
+  geom_histogram(binwidth=5)+
   labs(x="Speed (km per day)")+
   scale_fill_grey()+
   theme_classic()+
   theme(axis.text = element_text(size=12),
-        axis.title=element_text(size=14))+
-  facet_wrap(~area, scales="free_y")
+        axis.title=element_text(size=14))
 
 ggsave(speed_distribution, file=here("figures","travel speeds.png"),
        width=6, height=8)
@@ -80,15 +95,86 @@ ggsave(speed_km_per_day, file=here("figures","travel speeds km per day.png"),
        width=8, height=7)
 
 
+# travel times look okay!
 
-# travel times look okay! moving on to CJS models
+
+# Time in each location ####
+
+first_last <- dets %>%
+  group_by(tagID, rkm)%>%
+  arrange(datetime.local)%>%
+  summarise(first_det=first(datetime.local),
+            last_det=last(datetime.local),
+            duration=difftime(last_det,first_det,  units="hours"))%>%
+  arrange(.by_group = TRUE, desc(rkm))%>%
+  merge(., site_rkm, by="rkm")%>%
+  ungroup()
+
+dur_plot <- first_last %>%
+  mutate(rkm=as.factor(rkm))%>%
+  ggplot(., aes(x=rkm,y=duration))+
+  geom_boxplot()+
+  theme_classic()+
+  labs(x="River Kilometer", y="Duration of Detections (hours)")+
+  theme(axis.text = element_text(size=12),
+        axis.title=element_text(size=14))
+
+ggsave(dur_plot, file=here("figures", "time detected at each array.png"),
+       width=6, height=7)
+
+dur_summary <- first_last %>%
+  mutate(rkm=as.factor(rkm))%>%
+  group_by(rkm)%>%
+  summarise(median=median(duration, na.rm=TRUE),
+            min=min(duration, na.rm=TRUE),
+            max=max(duration, na.rm=TRUE))%>%
+  merge(., site_rkm, by="rkm")%>%
+  relocate(location_site, .before = rkm)%>%
+  rename(site=location_site)%>%
+  arrange(rkm)
+
+# Fish that died after going through pump? ####
+pump_morts <- first_last %>%
+  filter(rkm == 110.1 & duration > 72)%>%
+  select(tagID)
+
+fraser_dets <- dets %>%
+  filter(rkm < 110)
+
+morts_det_ds <- fraser_dets %>%
+  merge(., pump_morts, by="tagID")%>%
+  group_by(tagID, location_site)%>%
+  summarise(n())
+
+morts_det_ds %>%
+  ggplot(., aes(x=location_site))+
+  geom_histogram(stat="count")
+
+# what about fish that stayed upstream for 72 hours?
+
+up_morts <- first_last %>%
+  filter(rkm == 110.2 & duration > 240)%>%
+  select(tagID)
+
+ds_dets <- dets %>%
+  filter(rkm==110.1)%>%
+  filter(tagID %in% up_morts$tagID)%>%
+  group_by(tagID)%>%
+  summarise(n()) # only 10 of 15 fish were detected downstream after this long upstream
+
+up_morts_det_ds <- fraser_dets %>%
+  merge(., up_morts, by="tagID")%>%
+  group_by(tagID, location_site)%>%
+  summarise(n())
+
+up_morts_det_ds %>%
+  ggplot(., aes(x=location_site))+
+  geom_histogram(stat="count")
 
 # Make CJS model table ####
 # I only want the first time a fish was detected at each location
 
-dets3 <- dets2 %>%
-  mutate(up.move = ifelse(release.location %in% "ham.ds" & Receiver == 108658, TRUE, FALSE))%>%
-  filter(!up.move %in% TRUE)%>%
+dets3 <- dets %>%
   group_by(tagID, location_site)%>%
   filter(row_number()==1)%>%
   select(location_site, tagID, release.location, rkm)%>%
@@ -103,7 +189,12 @@ dets_wide <- dets3 %>%
               values_fill = 0, id_cols=c("tagID", "release.location"),
               names_prefix="rkm_")
 
-# I released 103+105 fish, so everyone is here!
+# 208 rows # only 206 unique ids
+
+dets_wide %>%
+  group_by(tagID)%>%
+  summarise(n=n())%>%
+  filter(n>1)
 
 # CJS Table ####
 cjs_table_ham <- dets_wide%>%
@@ -134,21 +225,21 @@ Phi.rl<- list(formula=~release) # This formula will have an intercept (for femal
 p.rl <- list(formula=~release) # Be careful of case-sensitive names. Use the exact group column that was in data
 
 test.m <- crm(ham.proc, ham.ddl,
-    model.parameters = list(Phi = Phi.rl, 
-                            p = p.rl),
-    accumulate = FALSE)# works!
+              model.parameters = list(Phi = Phi.rl, 
+                                      p = p.rl),
+              accumulate = FALSE)# works!
 
 fit.models=function()
-   {
-       Phi.rl=list(formula=~release)
-       Phi.time=list(formula=~time)
-       p.time=list(formula=~time)
-       p.rl=list(formula=~release)
-       p.dot=list(formula=~1)
-       cml=create.model.list(c("Phi","p"))
-       results=crm.wrapper(cml,data=ham.proc, ddl=ham.ddl,
-                                                   external=FALSE,accumulate=FALSE)
-       return(results)
+{
+  Phi.rl=list(formula=~release)
+  Phi.time=list(formula=~time)
+  p.time=list(formula=~time)
+  p.rl=list(formula=~release)
+  p.dot=list(formula=~1)
+  cml=create.model.list(c("Phi","p"))
+  results=crm.wrapper(cml,data=ham.proc, ddl=ham.ddl,
+                      external=FALSE,accumulate=FALSE)
+  return(results)
 }
 ham.models=fit.models()
 ham.models
@@ -160,7 +251,7 @@ plogis(ham.models[[3]]$results$beta$p)
 library(RMark)
 
 test <- process.data(data = cjs_table_ham,
-             model = "CJS", groups="release")
+                     model = "CJS", groups="release")
 
 ddl <- make.design.data(test)
 
@@ -199,17 +290,4 @@ prelim <- results.df %>%
 ggsave(prelim, file=here("figures","prelim survival estimates.png"),
        width=8, height=7)
 
-# Time in each location ####
-
-first_last <- dets2 %>%
-  group_by(tagID, rkm)%>%
-  arrange(datetime.local)%>%
-  summarise(first_det=first(datetime.local),
-            last_det=last(datetime.local),
-            duration=difftime(last_det,first_det,  units="mins"))%>%
-  arrange(.by_group = TRUE, desc(rkm))
-
-first_last
-  
-  
-  
+# next thing to do is remove all the signgle fraser detctiosn and run the model again. That's for another day :)
