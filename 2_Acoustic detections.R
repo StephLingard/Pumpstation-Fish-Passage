@@ -107,75 +107,107 @@ df6 <- df5%>%
   mutate(location_site=paste(Location, Site, sep="-"))%>%
   merge(., fish.dat, by="tagID")
 
+# Fish were detected up and downstream simultaneously because the floodgate transmitted detections.  
+# look at which fish were detected on the mid-channel vs floodgate receiver to determine if we can drop
+# a receiver from this dataframe and clean up dets
+
+ID_per_receiver <- df6%>%
+  group_by(location_site, Receiver, release.location)%>%
+  summarise(n=length(unique(tagID)))
+
+# mid-channel detected 183 IDs, floodgate detected 113 IDs.
+mid_chan <- df6 %>%
+  filter(Receiver == c(108647,101503))%>%
+  select(tagID)%>%
+  reframe(ID=unique(tagID))
+
+det_check <- df6%>%
+  filter(Receiver==108660)%>%
+  mutate(uniqueID= ifelse(tagID %in% mid_chan$ID, F, T))%>%
+  filter(uniqueID==T)%>%
+  select(tagID)%>%
+  group_by(tagID)%>%
+  summarise(n()) 
+
+# 5 tags only heard on floodgate and not on the 
+
+# how many of these unique 5 were from upstream releases?
+qa1 <- det_check %>% merge(., fish.dat, by="tagID") # all five are upstream released fish. 
+#  what do dets look like for these fish?
+floodgate_unique <- df6%>%
+  filter(tagID %in% qa1$tagID)%>%
+  group_by(tagID)%>%
+  arrange(datetime.local)%>%
+  select(tagID, datetime.local,Receiver, location_site)
+
+# quick plot of dets for these fish
+#ggplot(floodgate_unique, aes(x=datetime.local, y=location_site, color=Receiver))+
+  #geom_point()+
+  #facet_wrap(~tagID)
+
+# none of these fish were detected on the Fraser arrays. Thus, I can delete the floodgate receiver
+
 # Remove tags that aren't detected at least twice in the same region with in 1 hour ####
 
 df7 <- df6 %>%
-  group_by(tagID, location_site)%>%
-  mutate(cond1 = ifelse(lead(diff.time) > 1800, FALSE, TRUE), 
-         cond2= ifelse(diff.time > 1800, FALSE, TRUE))%>%
-  filter(cond1 | cond2 == TRUE)
+  filter(Receiver != 108660)
 
 # Data exploration and QA ####
 
-length(unique(df7$tagID)) #293 IDs detected out of 300
+length(unique(df7$tagID)) #295 IDs detected out of 300
 
-# Fish detected
+## detected by release location####
 
 df7 %>%
   group_by(release.location)%>%
   summarise(length(unique(tagID)))
 
-# Hammersley: 103 released upstream and 103 detected, # 105 released downstream but 100 detected
+# Hammersley: 103 released upstream and 103 detected, # 105 released downstream but 102 detected
 # Hatzic: 51 released ds with 50 detected, 41 released up with 39 detected
-
 # were any fish released downstream detected upstream?
 
 df7 %>%
   group_by(release.location, location_site)%>%
-  summarise(length(unique(tagID))) # a few. Could be noise
+  summarise(length(unique(tagID))) # some odd patterns here i.e., upstream movement
 
-# what about fish moving upstream? only interested in Hammersley because there is no upstream path (apparently)
-
+# Hammersley apparent upstream movement ####
 df7 %>%
   mutate(location_site=paste(Location, Site, sep="-"))%>%
   group_by(release.location, location_site)%>%
   summarise(length(unique(tagID)))
 
-up.movement <- df7%>%
+up_ham <- df7%>%
   filter(release.location %in% "ham.ds" & location_site %in% "upstream-mountain slough")
 
-up.movement%>%
-  ggplot(., aes(x=datetime.local))+
-  geom_histogram()+
-  facet_wrap(~tagID)
-
+# quick plot of det histories
 df7%>%
-  filter(tagID %in% up.movement$tagID)%>%
+  filter(tagID %in% up_ham$tagID)%>%
   ggplot(., aes(x=datetime.local, y=Receiver))+
   geom_point()+
-  facet_wrap(~tagID)
-
-# there are a lot of detections of some of these fish and the filters are very conservative
-upIDs <- up.movement%>%
-  group_by(tagID)%>%
-  filter(row_number()==1)
-# checked the map and it looks like dets could transmit through the flood gates as fish were detected on receiver ds of flood gate and the pump
+  facet_wrap(~tagID) # lots of dets of these fish.
+# It looks like dets could transmit through the floodgates as fish were detected on receiver ds of floodgate and the pump
 # at the same time.
 
-## Data QA and Clean Up ####
-dat_qa <- df7 %>%
-  filter(release.location %in% c("hat.ds","ham.ds") & location_site %in% c("upstream-mountain slough", "upstream-hatzic"))
-
-dat_qa %>%
-  group_by(release.location, release.datetime, location_site)%>%
-  summarise(length(unique(tagID)))
-
+# Hatzic Lake upstream movement (plausible due to floodgates being open) ####
 df7 %>%
   filter(release.location %in% "hat.ds" & release.datetime %in% "2024-05-15 11:46:00" & location_site %in% "upstream-hatzic") %>%
   group_by(tagID)%>%
   summarise(n())%>%
   rename(tagid=tagID)%>%
   merge(., tag.meta, by="tagid") # all these fish could have gone up stream with the tides as the tide gates were still open at hatzic.
+
+## Data Clean Up ####
+## will need to remove detections on 108658 after first detection downstream-mountain slough to 
+# account for transmission of dets through floodgate once downstream
+
+df8 <- df7 %>%
+  mutate(last_loc = lag(location_site),
+    move_dir = ifelse(location_site %in% c("upstream-mountain slough","upstream-hatzic") &
+  last_loc %in% c("downstream-mountain slough", "downstream-hatzic"), "UP","DOWN"))%>%
+  filter(!(Site %in% "mountain slough" & move_dir %in% "UP"))
+
+
+test <- df8%>%filter(move_dir %in% "UP")%>% select(tagID, location_site, Site, last_loc)
 
 ## Plot Detection Histories for each fish ####
 # start with numbering receivers at each location. Ham.us=1, ham.sd=2, hat.us=3, hat.ds=4. 
@@ -198,7 +230,7 @@ release.df <- fish.dat%>%
          location=release.location,
          tagID=as.character(tagID))
 
-plot.df <- df7%>%
+plot.df <- df8%>%
   mutate(location_site=paste(Location, Site, sep="-"))%>%
   select(tagID, location_site, datetime.local, release.location, 
          release.datetime, Receiver)%>%
@@ -211,21 +243,7 @@ plot.df <- df7%>%
                                             "3"="upstream-hatzic",
                                             "4"="downstream-hatzic"))
 
-plot.df$Receiver <- factor(plot.df$Receiver, levels=c("release","108647","101503","10866","108661","108658","108654"))
-
-# Exploring through a plot why fish were detected moving up stream past pump ####
-up.fish <- plot.df %>%
-  filter(tagID %in% up.movement$tagID)%>%
-  ggplot(., aes(x=datetime.local, y=Receiver))+
-  geom_point()+
-  geom_line()+
-  facet_wrap(~tagID, scales="free_x")
-
-ggsave(up.fish, file=here("figures","Hammersley Upstream Movement.png"),
-       width=9, height=8)
-
-# all the fish detected at the same time up and down were detected on the receiver ds of flood gates.
-# so transmission could travel through flood gates. Will have to edit this out later when interpreting things
+plot.df$Receiver <- factor(plot.df$Receiver, levels=c("release","108647","101503","108661","108658","108654"))
 
 # Read in Fraser Data ####
 
@@ -245,7 +263,7 @@ fraser.dets <- read.csv(here("raw data","Detections_DI_JS_Fraser_Lingard_2024_30
 
 # merge all detections and arrange up to downstream  ####
 
-all.dets <- df7%>%
+all.dets <- df8%>%
   mutate(tagID=as.integer(tagID), Receiver=as.integer(Receiver))%>%
   select(tagID, datetime.local,Receiver, location_site, Site, release.location)%>%
   bind_rows(., fraser.dets)
@@ -262,7 +280,7 @@ ham.dets <- all.dets%>%
 ham.dets %>%
   ungroup()%>%
   filter(release.location %in% c("ham.ds", "ham.us"))%>%
-  summarise(length(unique(tagID)))# 201 detected
+  summarise(length(unique(tagID)))# 205 detected
 
 ## create row with relase information ###
 ham.releases <- release.df%>%
@@ -277,8 +295,7 @@ ham.dets2 <- ham.dets %>%
   group_by(tagID)%>%
   arrange(tagID, datetime.local)
 
-#locations <- hammersley>mission>derby>barnston>portman>new west
-
+#locations <- hammersley (mountain slought) >mission>derby>barnston>portman>new west
 
 ham.dets2$location_site <- factor(ham.dets2$location_site, 
                                       levels=c(

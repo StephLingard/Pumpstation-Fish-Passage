@@ -43,6 +43,8 @@ dets <- dat%>%
 length(unique(dets$tagID))# all 208 are here
 
 test.dir <- dets %>%
+  group_by(tagID)%>%
+  arrange(datetime.local)%>%
   filter(rkm > prev_rkm)# need to remove these
 
 # need to remove dets of fish upstream of pump once they have gone through or been released ds
@@ -52,11 +54,12 @@ test.dir <- dets %>%
 releases <- dets%>%
   filter(Receiver %in% "release")
 
-# create filtered data frame to calcuate travel times ####
+# create filtered data frame to calculate travel times ####
 dets2 <- dets %>%
-  filter(transition==TRUE & dist_traveled > 0)%>%
-  bind_rows(., releases)%>%
   group_by(tagID)%>%
+  arrange(datetime.local)%>%
+  filter(rkm < prev_rkm & transition==TRUE)%>%
+  bind_rows(., releases)%>%
   arrange(datetime.local)%>%
   mutate(time_prev=difftime(datetime.local, lag(datetime.local), units="secs"),
          transition=ifelse(location_site == lag(location_site),F,T),
@@ -73,13 +76,15 @@ unique(dets2$Receiver)
 
 # speed plots ####
 speed_distribution <- dets2%>%
-  filter(speed_bodyL_secs > 0.0000)%>%
+  filter(speed_bodyL_secs > 0)%>%
   ggplot(., aes(x=speed_bodyL_secs))+
   geom_histogram()+
-  labs(x="Speed (body lengths per second)")
+  labs(x="Speed (body lengths per second)")+theme_classic()+
+  theme(axis.text = element_text(size=12),
+        axis.title=element_text(size=14))
 
 speed_km_per_day <- dets2%>%
-  filter(speed_km_day> 0)%>%
+  filter(speed_km_day > 0)%>%
   ggplot(., aes(x=speed_km_day))+
   geom_histogram(binwidth=5)+
   labs(x="Speed (km per day)")+
@@ -93,13 +98,9 @@ ggsave(speed_distribution, file=here("figures","travel speeds.png"),
 
 ggsave(speed_km_per_day, file=here("figures","travel speeds km per day.png"),
        width=8, height=7)
-
-
 # travel times look okay!
 
-
 # Time in each location ####
-
 first_last <- dets %>%
   group_by(tagID, rkm)%>%
   arrange(datetime.local)%>%
@@ -146,12 +147,7 @@ morts_det_ds <- fraser_dets %>%
   group_by(tagID, location_site)%>%
   summarise(n())
 
-morts_det_ds %>%
-  ggplot(., aes(x=location_site))+
-  geom_histogram(stat="count")
-
 # what about fish that stayed upstream for 72 hours?
-
 up_morts <- first_last %>%
   filter(rkm == 110.2 & duration > 240)%>%
   select(tagID)
@@ -175,6 +171,8 @@ up_morts_det_ds %>%
 # I only want the first time a fish was detected at each location
 
 dets3 <- dets %>%
+  group_by(tagID)%>%
+  arrange(datetime.local)%>%
   group_by(tagID, location_site)%>%
   filter(row_number()==1)%>%
   select(location_site, tagID, release.location, rkm)%>%
@@ -189,13 +187,6 @@ dets_wide <- dets3 %>%
               values_fill = 0, id_cols=c("tagID", "release.location"),
               names_prefix="rkm_")
 
-# 208 rows # only 206 unique ids
-
-dets_wide %>%
-  group_by(tagID)%>%
-  summarise(n=n())%>%
-  filter(n>1)
-
 # CJS Table ####
 cjs_table_ham <- dets_wide%>%
   unite(., "ch", rkm_110.2:rkm_23, sep="")%>%
@@ -207,87 +198,64 @@ cjs_table_ham <- dets_wide%>%
   rename(release=release.location)%>%
   as.data.frame(.)
 
-cjs_table_ham$release <-  fct_recode(cjs_table_ham$release, 
-                                     '1'="ham.us",'0'="ham.ds")
-cjs.m1 <- crm(cjs_table_ham, groups="release")
-cjs.m1 <- cjs.hessian(cjs.m1)
-plogis(cjs.m1$results$beta$Phi)
+write.csv(cjs_table_ham, file=here("cleaned data", "cjs table all dets.csv"))
 
-# getting more complicated
-ham.proc <- process.data(cjs_table_ham, group="release") # group variable has to be in the data
+# CJS table no single dets ####
 
-# Make design data (from processed data)
-ham.ddl <- make.design.data(ham.proc)
+dets4 <- dets %>%
+  group_by(tagID)%>%
+  arrange(datetime.local)%>%
+  group_by(tagID, location_site)%>%
+  filter(row_number()==2)%>% # selecting 2nd row of each tag-locaiton combo single dets removed
+  select(location_site, tagID, release.location, rkm)%>%
+  mutate(dummy_var = 1,
+         rkm=as.factor(rkm))%>%
+  ungroup()
 
-# formulas for params
-Phi.dot <- list(formula=~1)  # ~1 is always a constant (or single estimate)
-Phi.rl<- list(formula=~release) # This formula will have an intercept (for females) and an estimate for the difference between females and males
-p.rl <- list(formula=~release) # Be careful of case-sensitive names. Use the exact group column that was in data
+dets_wide_singles_rm <- dets4 %>%
+  select(-location_site)%>%
+  group_by(tagID,)%>%
+  pivot_wider(names_from = rkm, values_from = dummy_var, 
+              values_fill = 0, id_cols=c("tagID", "release.location"),
+              names_prefix="rkm_")
 
-test.m <- crm(ham.proc, ham.ddl,
-              model.parameters = list(Phi = Phi.rl, 
-                                      p = p.rl),
-              accumulate = FALSE)# works!
+cjs_table_ham2 <- dets_wide_singles_rm%>%
+  unite(., "ch", rkm_110.2:rkm_23, sep="")%>%
+  ungroup()%>%
+  select(-tagID)%>%
+  relocate(ch, .before="release.location")%>%
+  mutate(release.location=as.factor(release.location))%>%
+  ungroup()%>%
+  rename(release=release.location)%>%
+  as.data.frame(.)
 
-fit.models=function()
-{
-  Phi.rl=list(formula=~release)
-  Phi.time=list(formula=~time)
-  p.time=list(formula=~time)
-  p.rl=list(formula=~release)
-  p.dot=list(formula=~1)
-  cml=create.model.list(c("Phi","p"))
-  results=crm.wrapper(cml,data=ham.proc, ddl=ham.ddl,
-                      external=FALSE,accumulate=FALSE)
-  return(results)
-}
-ham.models=fit.models()
-ham.models
+write.csv(cjs_table_ham2, file=here("cleaned data", "cjs table no single dets.csv"))
 
-ham.models[[3]]$results
-plogis(ham.models[[3]]$results$beta$Phi)
-plogis(ham.models[[3]]$results$beta$p)
-# Try with RMark ####
-library(RMark)
+# time from release to pump passage ###
+release_dt <- releases%>%
+  select(datetime.local, Receiver, release.location, tagID)%>%
+  rename(release_dt=datetime.local)
 
-test <- process.data(data = cjs_table_ham,
-                     model = "CJS", groups="release")
+time_to_pass <- dets %>%
+  filter(location_site %in% "downstream-mountain slough")%>%
+  group_by(tagID)%>%
+  arrange(datetime.local)%>%
+  filter(row_number()==1)%>%
+  select(datetime.local, location_site, tagID)%>%
+  rename(first_ds_det=datetime.local, site=location_site)%>%
+  merge(., release_dt, by="tagID")%>%
+  mutate(time_to_pass= difftime(first_ds_det, release_dt, units="hours"))%>%
+  filter(release.location %in% "ham.us")
 
-ddl <- make.design.data(test)
-
-ham.mark1 <- mark(test, ddl)
-
-# more complicated model ####
-phi.release <- list(formula=~release)
-p.release <- list(formula=~release)
-
-phi.time <- list(formula=~time)
-p.time <- list(formula =~time)
-p<- list(formual=~1)
-
-release.model <- mark(test, ddl,
-                      model.parameters=list(Phi=phi.release))
-
-estimates <- plogis(release.model$results$beta$estimate)   
-lcl <- plogis(release.model$results$beta$lcl)
-ucl <- plogis(release.model$results$beta$ucl)
-params <- c("Phi:(Intercept)","Phi:release1 ","p:(Intercept)")
-params_plot <- c("Control","Archimedes","p")
-
-results.df <- data.frame(estimates, lcl, ucl, params, params_plot)
-
-prelim <- results.df %>% 
-  filter(!params %in% "p:(Intercept)")%>%
-  ggplot(., aes(x=params_plot, y=estimates))+
-  geom_point()+
-  geom_errorbar(aes(x=params_plot, ymin=lcl, ymax=ucl))+
+passage_plot <- time_to_pass %>%
+  mutate(release_dt=as.factor(release_dt))%>%
+  ggplot(., aes(x=release_dt, y=time_to_pass))+
+  geom_boxplot()+
   theme_classic()+
-  labs(x="Treatment", y="Survival (Phi)")+
-  theme(axis.title = element_text(size=14),
-        axis.text= element_text(size=12),
-        panel.grid = element_blank())
+  theme(axis.text.x=element_text(angle=90))+
+  labs(x="Release Date", y="Time to passage (hours)")
 
-ggsave(prelim, file=here("figures","prelim survival estimates.png"),
-       width=8, height=7)
+ggsave(passage_plot, file=here("figures", "time to passage.png"),
+       width=5, height=4)
 
-# next thing to do is remove all the signgle fraser detctiosn and run the model again. That's for another day :)
+# have to fix relese datetime which are in 12 hour instead of 24 hour clock :)
