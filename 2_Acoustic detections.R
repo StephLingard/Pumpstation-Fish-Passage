@@ -43,6 +43,8 @@ tag.meta <- tag.deployment%>%
   mutate(release.datetime=ymd_hm(paste(release.date, release.time, by=" ")), 
          release.date=ymd(release.date))
 
+unique(tag.meta$release.datetime)
+
 tag.meta %>%
   group_by(release.location)%>%
   summarise(length(unique(tagid)))
@@ -288,10 +290,11 @@ ham.releases <- release.df%>%
   select(tagID,datetime.local,release.location,location_site,Receiver)%>%
   mutate(Site="mountain slough",
          type="release", 
-         tagID=as.integer(tagID))
+         tagID=as.integer(tagID), 
+         datetime.local=force_tz(datetime.local, tz="America/Vancouver"))
 
 ham.dets2 <- ham.dets %>%
-  bind_rows(., ham.releases)%>%
+  rbind(., ham.releases)%>%
   group_by(tagID)%>%
   arrange(tagID, datetime.local)
 
@@ -310,7 +313,7 @@ ham.dets2$location_site <- factor(ham.dets2$location_site,
                                       "release"))
 
 ham.plots1 <- ham.dets2%>%
-  ggplot(., aes(x=datetime.local, y=location_site))+
+  ggplot(., aes(x=datetime.local, y=location_site, shape=type))+
   geom_point()+
   geom_line()+
   theme(axis.text.x=element_text(angle=(-45)))+
@@ -319,7 +322,7 @@ ham.plots1 <- ham.dets2%>%
              nrow=4, ncol=4, page=1)
 
 ham.plots2 <- ham.dets2%>%
-  ggplot(., aes(x=datetime.local, y=location_site))+
+  ggplot(., aes(x=datetime.local, y=location_site, shape=type))+
   geom_point()+
   geom_line()+
   theme(axis.text.x=element_text(angle=(-45)))+
@@ -328,7 +331,7 @@ ham.plots2 <- ham.dets2%>%
                       nrow=4, ncol=4, page=2)
 
 ham.plots3 <- ham.dets2%>%
-  ggplot(., aes(x=datetime.local, y=location_site))+
+  ggplot(., aes(x=datetime.local, y=location_site, shape=type))+
   geom_point()+
   geom_line()+
   theme(axis.text.x=element_text(angle=(-45)))+
@@ -338,7 +341,7 @@ ham.plots3 <- ham.dets2%>%
 
 
 ham.plots4 <- ham.dets2%>%
-  ggplot(., aes(x=datetime.local, y=location_site))+
+  ggplot(., aes(x=datetime.local, y=location_site, shape=type))+
   geom_point()+
   geom_line()+
   theme(axis.text.x=element_text(angle=(-45)))+
@@ -347,7 +350,7 @@ ham.plots4 <- ham.dets2%>%
                       nrow=4, ncol=4, page=4)
   
 ham.plots5 <- ham.dets2%>%
-  ggplot(., aes(x=datetime.local, y=location_site))+
+  ggplot(., aes(x=datetime.local, y=location_site, shape=type))+
   geom_point()+
   geom_line()+
   theme(axis.text.x=element_text(angle=(-45)))+

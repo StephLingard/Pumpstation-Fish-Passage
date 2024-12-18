@@ -24,8 +24,7 @@ site_rkm <- tibble(rkm, location_site)%>%
   mutate(rkm=as.numeric(rkm))
 
 # read in dets and add rkm column ####
-dat <- read_csv(here("cleaned data","cleaned detections from hammersley.csv"),show_col_types = FALSE)%>%
-  select(-'...1')
+dat <- read.csv(here("cleaned data","cleaned detections from hammersley.csv"))
 
 # manipulate data to have previous and next detections for filtering ####
 dets <- dat%>%
@@ -253,9 +252,21 @@ passage_plot <- time_to_pass %>%
   geom_boxplot()+
   theme_classic()+
   theme(axis.text.x=element_text(angle=90))+
-  labs(x="Release Date", y="Time to passage (hours)")
+  labs(x="Release Date", y="Time to passage (hours)")+
+  geom_text(data=(time_to_pass %>% group_by(release_dt) %>% filter(!is.na(time_to_pass))%>% 
+                    summarise(n=n())), 
+            aes(x=seq(1,7), y=630, label= paste0("n = ", n)))+
+  expand_limits(y = c(0, 650))
 
 ggsave(passage_plot, file=here("figures", "time to passage.png"),
        width=5, height=4)
 
-# have to fix relese datetime which are in 12 hour instead of 24 hour clock :)
+time_to_pass %>%
+  summarise(n=n(),
+            min=min(time_to_pass, na.rm=TRUE),
+            max=max(time_to_pass, na.rm=TRUE),
+            mean=mean(time_to_pass, na.rm=TRUE), 
+            sd=sd(time_to_pass, na.rm=TRUE), 
+            median=median(time_to_pass, na.rm=TRUE))
+
+# have to fix release datetime which are in 12 hour instead of 24 hour clock :)
