@@ -16,4 +16,22 @@ complete_dat <- surg.dat %>%
 complete_dat %>%
   group_by(release.location)%>%
   summarise(n())
+
+head(complete_dat)
+
+size.plot <- complete_dat%>%
+  filter(release.location %in% c("ham.us","ham.ds"))%>%
+  mutate(release.location = fct_recode(release.location,
+             Control = "ham.ds",
+             Archimedes = "ham.us"))%>%
+  ggplot(., aes(x=release.location, y=length))+
+  geom_point()+
+  geom_boxplot()+
+  theme_classic()+
+  labs(x="Release Group",y="Fork Length (mm)")+
+  theme(axis.text=element_text(size=12),
+        axis.title=element_text(size=14))
+
+ggsave(size.plot, file=here("figures", "fish length by release group.png"),
+                            width=6, height=6)
                           

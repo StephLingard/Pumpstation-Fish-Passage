@@ -269,4 +269,65 @@ time_to_pass %>%
             sd=sd(time_to_pass, na.rm=TRUE), 
             median=median(time_to_pass, na.rm=TRUE))
 
-# have to fix release datetime which are in 12 hour instead of 24 hour clock :)
+# Time to reach New West
+
+new_west_dets <- dets2 %>%
+  filter(location_site %in% "NEW_WEST")%>%
+  group_by(tagID)%>%
+  filter(row_number()==1)%>%
+  select(tagID, location_site, datetime.local)%>%
+  merge(., release_dt, by="tagID")%>%
+  mutate(time_to_nw=as.numeric(difftime(datetime.local, release_dt, units="days")))
+
+
+new_west_time <- new_west_dets %>%
+    group_by(release.location)%>%
+    summarise(n=n(),
+            min=min(time_to_nw, na.rm=TRUE),
+            max=max(time_to_nw, na.rm=TRUE),
+            mean=mean(time_to_nw, na.rm=TRUE), 
+            sd=sd(time_to_nw, na.rm=TRUE), 
+            median=median(time_to_nw, na.rm=TRUE))
+
+# Time in each segment
+
+# How do I calculate time in each segment. Its the time from their first detection at one site to the first detection at the next site
+# I think i filter out all the "transitions" and then calculate the time diff between each
+
+seg_durations <- dets %>%
+  select(tagID, location_site, Site, datetime.local, transition, release.location)%>%
+  filter(transition==TRUE)%>%
+  group_by(tagID)%>%
+  arrange(datetime.local)%>%
+  mutate(time_next=difftime(datetime.local, lag(datetime.local)),
+         prev_location=lag(location_site))%>%
+  select(-time_next)%>%
+  arrange(tagID, datetime.local)%>%
+  group_by(tagID)%>%
+  mutate(time_to=difftime(datetime.local, lag(datetime.local),units="hours"))%>%
+  ungroup()
+  
+summary_durations <- seg_durations%>%
+  group_by(location_site, prev_location)%>%
+  summarise(n=n(),
+            min=min(time_to, na.rm=TRUE),
+            max=max(time_to, na.rm=TRUE),
+            mean=mean(time_to, na.rm=TRUE), 
+            sd=sd(time_to, na.rm=TRUE), 
+            median=median(time_to, na.rm=TRUE))%>%
+  filter(!location_site %in% "upstream-mountain slough" & !prev_location %in% c(NA, "upstream-mountain slough"))%>%
+  mutate(prev_current=paste(location_site, prev_location, sep="_"))
+
+summary_durations%>%
+  ggplot(., aes(x=prev_current, y=mean))+
+  geom_point()+
+  theme(axis.text = element_text(angle=90))
+
+# need to clean up this plot and to condense the segments down. 
+# I would also like to add the 95% CI bars
+# I first plotted the means by release location separately but there was now difference between groups
+# So i can calcluate these all together in one plot
+
+# Need a fish size plot
+
+
