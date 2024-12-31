@@ -312,62 +312,27 @@ ham.dets2$location_site <- factor(ham.dets2$location_site,
                                       "upstream-mountain slough",
                                       "release"))
 
-ham.plots1 <- ham.dets2%>%
+i <- ceiling(
+  length(unique(ham.dets2$tagID)) / 16) # set the number of pages
+
+pdf(file=here("figures", "hammersley detection plots.pdf"), 
+    width=10, height=8)
+
+lapply(seq(i), function(page) {
+  ham.plots1 <- ham.dets2%>%
   ggplot(., aes(x=datetime.local, y=location_site, shape=type))+
   geom_point()+
   geom_line()+
   theme(axis.text.x=element_text(angle=(-45)))+
   labs(x="", y="Site Name")+
   facet_wrap_paginate(~tagID, scales="free_x",
-             nrow=4, ncol=4, page=1)
+             nrow=4, ncol=4, page=page)
+})
 
-ham.plots2 <- ham.dets2%>%
-  ggplot(., aes(x=datetime.local, y=location_site, shape=type))+
-  geom_point()+
-  geom_line()+
-  theme(axis.text.x=element_text(angle=(-45)))+
-  labs(x="", y="Site Name")+
-  facet_wrap_paginate(~tagID, scales="free_x",
-                      nrow=4, ncol=4, page=2)
+dev.off()
 
-ham.plots3 <- ham.dets2%>%
-  ggplot(., aes(x=datetime.local, y=location_site, shape=type))+
-  geom_point()+
-  geom_line()+
-  theme(axis.text.x=element_text(angle=(-45)))+
-  labs(x="", y="Site Name")+
-  facet_wrap_paginate(~tagID, scales="free_x",
-                      nrow=4, ncol=4, page=3)
-
-
-ham.plots4 <- ham.dets2%>%
-  ggplot(., aes(x=datetime.local, y=location_site, shape=type))+
-  geom_point()+
-  geom_line()+
-  theme(axis.text.x=element_text(angle=(-45)))+
-  labs(x="", y="Site Name")+
-  facet_wrap_paginate(~tagID, scales="free_x",
-                      nrow=4, ncol=4, page=4)
-  
-ham.plots5 <- ham.dets2%>%
-  ggplot(., aes(x=datetime.local, y=location_site, shape=type))+
-  geom_point()+
-  geom_line()+
-  theme(axis.text.x=element_text(angle=(-45)))+
-  labs(x="", y="Site Name")+
-  facet_wrap_paginate(~tagID, scales="free_x",
-                      nrow=4, ncol=4, page=5)   
-
-ggsave(ham.plots1, file=here("figures", "hammersley fish page 1.png"), 
-       width=10, height=8)
-ggsave(ham.plots2, file=here("figures", "hammersley fish page 2.png"), 
-       width=10, height=8)
-ggsave(ham.plots3, file=here("figures", "hammersley fish page 3.png"), 
-       width=10, height=8)
-ggsave(ham.plots4, file=here("figures", "hammersley fish page 4.png"), 
-       width=10, height=8)
-ggsave(ham.plots5, file=here("figures", "hammersley fish page 5.png"), 
-       width=10, height=8)
+#ggsave(ham.plots1, file=here("figures", "Hammersley fish page 5.png"), 
+       #width=10, height=8)
 
 ## How many fish passed hammersley? #####
 dets_location <- ham.dets2 %>%

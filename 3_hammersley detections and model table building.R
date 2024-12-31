@@ -304,7 +304,7 @@ seg_durations <- dets %>%
   select(-time_next)%>%
   arrange(tagID, datetime.local)%>%
   group_by(tagID)%>%
-  mutate(time_to=difftime(datetime.local, lag(datetime.local),units="hours"))%>%
+  mutate(time_to=difftime(datetime.local, lag(datetime.local),units="days"))%>%
   ungroup()
   
 summary_durations <- seg_durations%>%
@@ -316,18 +316,44 @@ summary_durations <- seg_durations%>%
             sd=sd(time_to, na.rm=TRUE), 
             median=median(time_to, na.rm=TRUE))%>%
   filter(!location_site %in% "upstream-mountain slough" & !prev_location %in% c(NA, "upstream-mountain slough"))%>%
-  mutate(prev_current=paste(location_site, prev_location, sep="_"))
+  mutate(prev_current=paste(prev_location,location_site, sep=" to "))%>%
+  suppressWarnings()
 
 summary_durations%>%
+  filter(!prev_current %in% c("downstream-mountain slough to DERBY",
+                              "downstream-mountain slough to BARNSTON", 
+                              "downstream-mountain slough to PORT_MANN" ,
+                              "MISSION to downstream-mountain slough",
+                              "MISSION to downstream-mountain slough",
+                              "NEW_WEST to PORT_MANN"))%>%
+  mutate(prev_current=gsub(prev_current, pattern = "downstream-", replacement = ""))%>%
   ggplot(., aes(x=prev_current, y=mean))+
   geom_point()+
-  theme(axis.text = element_text(angle=90))
+  labs(x="Segment", y="Duration of resdience (Days)")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=90))
+
+travel_times <- seg_durations%>%
+  filter(!location_site %in% "upstream-mountain slough" & !prev_location %in% c(NA, "upstream-mountain slough"))%>%
+  mutate(prev_current=paste(prev_location,location_site, sep=" to "))%>%
+  filter(!prev_current %in% c("downstream-mountain slough to DERBY",
+                              "downstream-mountain slough to BARNSTON", 
+                              "downstream-mountain slough to PORT_MANN" ,
+                              "MISSION to downstream-mountain slough",
+                              "MISSION to downstream-mountain slough",
+                              "NEW_WEST to PORT_MANN"))%>%
+  mutate(prev_current=gsub(prev_current, pattern = "downstream-", replacement = ""))%>%
+  mutate(prev_current=gsub(prev_current, pattern = "hatzic", replacement = "HATZIC"))%>%
+  mutate(prev_current=gsub(prev_current, pattern = "mountain slough", replacement = "MOUNTAIN SLOUGH"))%>%
+  ggplot(., aes(x=prev_current, y=time_to))+
+  geom_boxplot()+
+  labs(x="Segment", y="Duration of resdience (Days)")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=90))
+ggsave(travel_times, file=here("figures","duration in each segment.png"),
+                               width=6, height=6)
 
 # need to clean up this plot and to condense the segments down. 
-# I would also like to add the 95% CI bars
-# I first plotted the means by release location separately but there was now difference between groups
-# So i can calcluate these all together in one plot
 
-# Need a fish size plot
 
 
