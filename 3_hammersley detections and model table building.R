@@ -26,6 +26,8 @@ site_rkm <- tibble(rkm, location_site)%>%
 # read in dets and add rkm column ####
 dat <- read.csv(here("cleaned data","cleaned detections from hammersley.csv"))
 
+fraser_n <- dat %>% filter(Site %in% "fraser")%>%summarise(length(unique(tagID)))
+
 # manipulate data to have previous and next detections for filtering ####
 dets <- dat%>%
   filter(Receiver!=	108660)%>%
@@ -79,24 +81,24 @@ speed_distribution <- dets2%>%
   ggplot(., aes(x=speed_bodyL_secs))+
   geom_histogram()+
   labs(x="Speed (body lengths per second)")+theme_classic()+
-  theme(axis.text = element_text(size=12),
-        axis.title=element_text(size=14))
+  theme(axis.text = element_text(size=14),
+        axis.title=element_text(size=16))
 
 speed_km_per_day <- dets2%>%
   filter(speed_km_day > 0)%>%
   ggplot(., aes(x=speed_km_day))+
   geom_histogram(binwidth=5)+
-  labs(x="Speed (km per day)")+
+  labs(x="Speed (km per day)", y="Count")+
   scale_fill_grey()+
   theme_classic()+
-  theme(axis.text = element_text(size=12),
-        axis.title=element_text(size=14))
+  theme(axis.text = element_text(size=14),
+        axis.title=element_text(size=16))
 
 ggsave(speed_distribution, file=here("figures","travel speeds.png"),
-       width=6, height=8)
+       width=6, height=7)
 
 ggsave(speed_km_per_day, file=here("figures","travel speeds km per day.png"),
-       width=8, height=7)
+       width=6, height=7)
 # travel times look okay!
 
 # Time in each location ####

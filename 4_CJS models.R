@@ -1,13 +1,19 @@
 # fitting CJS survival models
 # S Lingard
 # Created: December 18, 2024
+library(marked)
+library(RMark)
+library(tidyverse)
+library(here)
 
-
-cjs_table_ham <- read_csv(here("cleaned data","cjs table all dets.csv"))
+cjs_table_ham <- read.csv(here("cleaned data","cjs table all dets.csv"))%>%select(ch,release)
 cjs_table_ham$release <-  fct_recode(cjs_table_ham$release, 
                                      '1'="ham.us",'0'="ham.ds")
+
 cjs.m1 <- crm(cjs_table_ham, groups="release")
+
 cjs.m1 <- cjs.hessian(cjs.m1)
+
 plogis(cjs.m1$results$beta$Phi)
 
 # getting more complicated
@@ -77,12 +83,12 @@ prelim <- results.df %>%
   geom_errorbar(aes(x=params_plot, ymin=lcl, ymax=ucl))+
   theme_classic()+
   labs(x="Treatment", y="Survival (Phi)")+
-  theme(axis.title = element_text(size=14),
-        axis.text= element_text(size=12),
+  theme(axis.title = element_text(size=16),
+        axis.text= element_text(size=14),
         panel.grid = element_blank())
 
 ggsave(prelim, file=here("figures","survival estimates all.png"),
-       width=8, height=7)
+       width=6, height=6)
 
 # next thing to do is remove all the single fraser detections and run the model again. That's for another day :)
 cjs_table_ham2 <- read_csv(here("cleaned data","cjs table no single dets.csv"))
