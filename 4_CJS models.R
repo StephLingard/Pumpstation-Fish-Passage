@@ -2,7 +2,6 @@
 # S Lingard
 # Created: December 18, 2024
 library(marked)
-library(RMark)
 library(tidyverse)
 library(here)
 
@@ -10,9 +9,11 @@ cjs_table_ham <- read.csv(here("cleaned data","cjs table all dets.csv"))%>%selec
 cjs_table_ham$release <-  fct_recode(cjs_table_ham$release, 
                                      '1'="ham.us",'0'="ham.ds")
 
+cjs_table_ham$ch <- as.character(cjs_table_ham$ch)
+
 cjs.m1 <- crm(cjs_table_ham, groups="release")
 
-cjs.m1 <- cjs.hessian(cjs.m1)
+#cjs.m1 <- cjs.hessian(cjs.m1)
 
 plogis(cjs.m1$results$beta$Phi)
 
