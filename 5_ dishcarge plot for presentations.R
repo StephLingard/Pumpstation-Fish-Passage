@@ -34,14 +34,14 @@ plot <- dat_long%>%
   mutate(YEAR=as.factor(YEAR))%>%
   ggplot(., aes(x=doy, y=discharge, color=YEAR))+
   geom_point(show.legend = FALSE, size=0.5)+
-  geom_hline(yintercept=2800, colour="red", linetype="dashed")+
+  geom_hline(yintercept=2800, colour="red", linetype="dashed", linewidth=2)+
   theme_classic()+
   scale_colour_grey()+
-  labs(x="Day of Year", y=expression(paste("Discharge ", m^{3}/s,)))+
+  labs(x="Day of Year", y=expression(paste("Fraser Discharge at Hope ", m^{3}/s,)))+
   scale_x_continuous(breaks=seq(0,350,50), labels=date_labs)+
   theme(axis.text=element_text(size=12))
 
 ggsave(plot, file=here("figures","discharge plot fraser at hope 2010-2024.png"),
-       width=6, height=6)
+       width=6, height=4)
 
 

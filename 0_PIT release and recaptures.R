@@ -48,40 +48,42 @@ recap.final <- recap.dat %>%
   merge(., release.recap.groups, by="tag.id")%>%
   mutate(hemoglobin=as.numeric(hemoglobin),
          lactate=as.numeric(lactate))%>%
-  filter(time_diff < 60)
+  filter(time_diff < 60)%>%
+  filter(!treatment %in% "archimedes1")%>%
+  mutate(release_group = ifelse(treatment %in% "control", "control", "archimedes"))
 
 names(recap.final)
 
-lactate <- ggplot(recap.final, aes(x=release_treatment, y=lactate))+
+lactate <- ggplot(recap.final, aes(x=release_group, y=lactate))+
   geom_boxplot()+
   geom_point()+
   theme_bw()+
   theme(axis.text=element_text(size=12),
         axis.title=element_text(size=14))+
-  labs(x="Treatment", y="Lactate (mmol/L)")+
-  geom_text(data=(recap.final %>% group_by(treatment) %>% filter(!is.na(lactate)) %>%
-                    summarise(n=n())), aes(x=seq(1,4), y=18, label= paste0("n = ", n)))+
+  labs(x="Release Group", y="Lactate (mmol/L)")+
+  geom_text(data=(recap.final %>% group_by(release_group) %>% filter(!is.na(lactate)) %>%
+                    summarise(n=n())), aes(x=seq(1,2), y=18, label= paste0("n = ", n)))+
   expand_limits(y = c(0, 20))
 
 recap.final%>%group_by(treatment)%>%summarise(n())
 
 
 ggsave(lactate, file=here("figures", "lactate by treatment.png"),
-       width=6, height=6)
+       width=5, height=5)
 
-hemo <- ggplot(recap.final, aes(x=release_treatment, y=hemoglobin))+
+hemo <- ggplot(recap.final, aes(x=release_group, y=hemoglobin))+
   geom_boxplot()+
   geom_point()+
   theme_bw()+
   theme(axis.text=element_text(size=12),
         axis.title=element_text(size=14))+
   labs(x="Treatment", y="Hemoglobin (g/L)")+
-  geom_text(data=(recap.final %>% group_by(treatment) %>% filter(!is.na(hemoglobin))%>% 
+  geom_text(data=(recap.final %>% group_by(release_group) %>% filter(!is.na(hemoglobin))%>% 
                     summarise(n=n())), 
-           aes(x=seq(1,4), y=115, label= paste0("n = ", n)))+
+           aes(x=seq(1,2), y=115, label= paste0("n = ", n)))+
   expand_limits(y = c(50, 120))
 
-ggsave(hemo, file=here("figures", "hemoglobin by treatment.png"),width=6, height=6)
+ggsave(hemo, file=here("figures", "hemoglobin by treatment.png"),width=5, height=5)
 
 hemo_time <- ggplot(recap.final, aes(x=time_diff, y=hemoglobin, color=release_treatment))+
   geom_point()+
