@@ -52,6 +52,7 @@ ham.models[[3]]$results
 plogis(ham.models[[3]]$results$beta$Phi)
 plogis(ham.models[[3]]$results$beta$p)
 # Try with RMark ####
+
 library(RMark)
 all_dat <- process.data(data = cjs_table_ham,
                      model = "CJS", groups="release")

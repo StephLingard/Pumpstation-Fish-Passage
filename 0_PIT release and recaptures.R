@@ -17,6 +17,9 @@ rel.dat <- rel.dir %>% map_dfr(read_csv)%>%
   rename(tag.id='last.four')%>%
   select(date.time, tag.id,treatment)
 
+rel.dat%>%group_by(treatment)%>%
+  summarise(n())
+
 # read in recap data
 
 recap.dat <- read_csv(here("raw data", "injury assessment and blood sampling_final.csv"))%>%
@@ -52,6 +55,20 @@ recap.final <- recap.dat %>%
   filter(!treatment %in% "archimedes1")%>%
   mutate(release_group = ifelse(treatment %in% "control", "control", "archimedes"))
 
+# ttest of hemo between treatments ####
+library(infer)
+
+recap.final %>%
+  group_by(release_group)%>%
+  summarise(statistic = shapiro.test(hemoglobin)$statistic, 
+                p.value = shapiro.test(hemoglobin)$p.value) # passes normality for each group
+
+recap.final %>%
+ drop_na(hemoglobin) %>%
+  t_test(formula = hemoglobin ~ release_group,
+         alternative = "two-sided",
+         )
+
 names(recap.final)
 
 lactate <- ggplot(recap.final, aes(x=release_group, y=lactate))+
@@ -75,8 +92,9 @@ hemo <- ggplot(recap.final, aes(x=release_group, y=hemoglobin))+
   geom_boxplot()+
   geom_point()+
   theme_bw()+
-  theme(axis.text=element_text(size=12),
-        axis.title=element_text(size=14))+
+  theme(axis.text=element_text(size=14),
+        axis.title=element_text(size=14),
+        panel.grid=element_blank())+
   labs(x="Treatment", y="Hemoglobin (g/L)")+
   geom_text(data=(recap.final %>% group_by(release_group) %>% filter(!is.na(hemoglobin))%>% 
                     summarise(n=n())), 
@@ -90,7 +108,7 @@ hemo_time <- ggplot(recap.final, aes(x=time_diff, y=hemoglobin, color=release_tr
   labs(x="Time between release and sampling (minutes)")+
   theme_bw()+
   theme(axis.text=element_text(size=12),
-        axis.title=element_text(size=14)+
+        axis.title=element_text(size=14),
           panel.grid.major = element_blank())
   
   
