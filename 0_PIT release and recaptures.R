@@ -142,3 +142,4 @@ scale.loss.table <- injuries %>%
   group_by(pump, value)%>%
   summarise(n())
 
+recap.final%>%filter(!treatment %in% "control")%>%summarise(n())
